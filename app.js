@@ -5,10 +5,12 @@ const bodyParser = require("body-parser");
 const ejs = require("ejs");
 const mongoose = require("mongoose");
 const encrypt = require("mongoose-encryption");
+const bcrypt = require('bcrypt');
+const saltRounds = 10;
+
 
 const app = express();
 
-console.log(process.env.API_KEY)
 
 app.use(express.static("public"));
 app.set('view engine', 'ejs');
@@ -62,21 +64,28 @@ app.get("/register", async function(req, res){
 });
 
 app.post("/register", async function(req, res){
-    const newUser = new User({
-        email: req.body.username,
-        password: req.body.password
-    });
-
-    try {
-      const savedUser = await newUser.save();
-      if(!savedUser) {
-        console.log("Error saving user")
+    bcrypt.hash(req.body.password, saltRounds, async function(err, hash){
+      if (err) {
+        console.error("Error hashing password:", err)
       } else {
-        res.render("secrets");
+
+      try {
+        const newUser = new User({
+          email: req.body.username,
+          password: hash
+        });
+
+        const savedUser = await newUser.save();
+        if(!savedUser) {
+          console.log("Error saving user")
+        } else {
+          res.render("secrets");
+        }
+      } catch (error) {
+          console.error("error saving user:", error);
       }
-    } catch (error) {
-        console.error("error saving user:", error);
     }
+  });
 });
 
 app.post("/login", async function(req, res){
@@ -87,12 +96,13 @@ app.post("/login", async function(req, res){
       if(!foundUser) {
         console.log("User not found");
       } else {
-        if(foundUser.password === password) {
-            res.render("secrets")
+        if(foundUser) {
+          bcrypt.compare(password, foundUser.password, async function(err, result){
+            if(result === true) {
+              res.render("secrets");
+            }
+          });
         }
-        // if(foundUser) {
-           
-        // }
       }
     } catch (error) {
       console.error("error saving user:", error);
